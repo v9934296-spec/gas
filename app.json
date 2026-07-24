@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Rap Lab",
+    "slug": "rap-lab",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "raplab",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.onflow.raplab",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.onflow.raplab",
+      "versionCode": 1
+    },
+    "plugins": [
+      "expo-audio",
+      [
+        "expo-speech-transcriber",
+        {
+          "speechRecognitionPermission": "Rap Lab uses speech recognition to transcribe your verses for local analysis.",
+          "microphonePermission": "Rap Lab needs microphone access to record your verses."
+        }
+      ]
+    ]
+  }
+}
