@@ -28,6 +28,12 @@ npm test
 npm run validate:phase0
 ```
 
+Require the current fixtures to clear every launch gate only when you are making a shipping decision:
+
+```bash
+npm run validate:phase0:launch-ready
+```
+
 ## V1 launch gates
 
 Do not treat V1 as launch-ready unless the validation report clears these thresholds:
@@ -72,7 +78,7 @@ Social and battle surfaces are frozen for V1 and remain trust-gated off by defau
 - Evidence receipts for BARZ Phase 0
 - Local save / reopen / delete history with AsyncStorage
 - Seed validation harness for Phase 0 launch gates
-- CI-ready Phase 0 validation script (`npm run validate:phase0`) that exits non-zero when launch gates fail
+- CI-ready Phase 0 validation report (`npm run validate:phase0`) plus an explicit launch-readiness gate (`npm run validate:phase0:launch-ready`)
 
 ## Honest limitations
 
