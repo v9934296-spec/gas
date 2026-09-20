@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "id": "phone-1",
+      "reference": "Phone mic catches the verse with a little room tone",
+      "hypothesis": "Phone mic catches the verse with a little tone"
+    },
+    {
+      "id": "phone-2",
+      "reference": "Even with traffic outside the cadence still holds",
+      "hypothesis": "Even with traffic outside cadence still holds"
+    },
+    {
+      "id": "phone-3",
+      "reference": "Pocket stays tight though the corners get noisy",
+      "hypothesis": "Pocket stays tight though corners get noisy"
+    }
+  ]
+}

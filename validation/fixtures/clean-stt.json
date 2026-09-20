@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "id": "clean-1",
+      "reference": "I paint the flame and stake a claim tonight",
+      "hypothesis": "I paint the flame and stake a claim tonight"
+    },
+    {
+      "id": "clean-2",
+      "reference": "Sharp syllables cut through the kick and the snare",
+      "hypothesis": "Sharp syllables cut through the kick and snare"
+    },
+    {
+      "id": "clean-3",
+      "reference": "Every bar lands heavy when the pocket stays there",
+      "hypothesis": "Every bar lands heavy when the pocket stays there"
+    }
+  ]
+}

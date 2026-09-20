@@ -1,0 +1,8 @@
+{
+  "cases": [
+    { "id": "silence-1", "expectedNoBars": true, "detectedNoBars": true },
+    { "id": "silence-2", "expectedNoBars": true, "detectedNoBars": true },
+    { "id": "silence-3", "expectedNoBars": false, "detectedNoBars": false },
+    { "id": "silence-4", "expectedNoBars": false, "detectedNoBars": false }
+  ]
+}
