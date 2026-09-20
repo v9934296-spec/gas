@@ -2,17 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { PHASE0_THRESHOLDS, summarizePhase0Validation } from "../src/phase0Validation.js";
 
-const fixtures = {
+const passingFixtures = {
   cleanStt: {
     cases: [
       { id: "c1", reference: "alpha beta gamma delta", hypothesis: "alpha beta gamma delta" },
-      { id: "c2", reference: "pocket stays deep in the groove", hypothesis: "pocket stays deep in groove" },
+      { id: "c2", reference: "pocket stays deep in the groove", hypothesis: "pocket stays deep in the groove" },
     ],
   },
   phoneStt: {
     cases: [
-      { id: "p1", reference: "phone mic catches the room tone", hypothesis: "phone mic catches room tone" },
-      { id: "p2", reference: "cadence survives the noise outside", hypothesis: "cadence survives noise outside" },
+      { id: "p1", reference: "phone mic catches the room tone", hypothesis: "phone mic catches the room tone" },
+      { id: "p2", reference: "cadence survives the noise outside", hypothesis: "cadence survives the noise outside" },
     ],
   },
   silence: {
@@ -47,8 +47,8 @@ const fixtures = {
   },
 };
 
-test("Phase 0 validation summary exposes launch gates", () => {
-  const report = summarizePhase0Validation(fixtures);
+test("Phase 0 validation summary can clear launch gates", () => {
+  const report = summarizePhase0Validation(passingFixtures);
 
   assert.equal(report.thresholds.cleanSttPct, PHASE0_THRESHOLDS.cleanSttPct);
   assert.ok(report.cleanStt.averagePct >= PHASE0_THRESHOLDS.cleanSttPct);
@@ -60,9 +60,25 @@ test("Phase 0 validation summary exposes launch gates", () => {
 
 test("Phase 0 launch stays gated when thresholds fail", () => {
   const report = summarizePhase0Validation({
-    ...fixtures,
+    ...passingFixtures,
     phoneStt: { cases: [{ id: "bad", reference: "alpha beta gamma delta", hypothesis: "alpha" }] },
   });
 
+  assert.equal(report.launchReady, false);
+});
+
+test("Seed fixture profile remains below the phone STT launch gate", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    phoneStt: {
+      cases: [
+        { id: "phone-1", reference: "phone mic catches the verse with a little room tone", hypothesis: "phone mic catches the verse with a little tone" },
+        { id: "phone-2", reference: "even with traffic outside the cadence still holds", hypothesis: "even with traffic outside cadence still holds" },
+        { id: "phone-3", reference: "pocket stays tight though the corners get noisy", hypothesis: "pocket stays tight though corners get noisy" },
+      ],
+    },
+  });
+
+  assert.equal(report.phoneStt.averagePct < PHASE0_THRESHOLDS.phoneSttPct, true);
   assert.equal(report.launchReady, false);
 });
