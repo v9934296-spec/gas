@@ -23,7 +23,10 @@ const fixtures = {
 const report = summarizePhase0Validation(fixtures);
 const gateLines = Object.entries(report.gates).map(([name, gate]) => {
   const status = gate.pass ? "PASS" : "FAIL";
-  return `${status} ${name}: actual=${gate.actual} threshold=${gate.threshold}`;
+  const pctDetail = Number.isFinite(gate.actualPct) && Number.isFinite(gate.thresholdPct)
+    ? ` (${gate.actualPct}% vs ${gate.thresholdPct}%)`
+    : "";
+  return `${status} ${name}: actual=${gate.actual} threshold=${gate.threshold}${pctDetail}`;
 });
 
 console.log("BARZ PHASE 0 TRUST GATES");

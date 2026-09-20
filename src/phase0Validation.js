@@ -8,6 +8,16 @@ export const PHASE0_THRESHOLDS = Object.freeze({
   timingAgreementOutOf: 8,
 });
 
+export function getPhase0TimingGate() {
+  return {
+    minMatches: PHASE0_THRESHOLDS.timingAgreementMinMatches,
+    outOf: PHASE0_THRESHOLDS.timingAgreementOutOf,
+    minimumPct: Number(
+      ((PHASE0_THRESHOLDS.timingAgreementMinMatches / PHASE0_THRESHOLDS.timingAgreementOutOf) * 100).toFixed(1),
+    ),
+  };
+}
+
 function tokenize(text) {
   return (typeof text === "string" ? text.toLowerCase().match(/[a-z0-9']+/g) || [] : []).filter(Boolean);
 }
@@ -76,9 +86,7 @@ export function summarizePhase0Validation(fixtures) {
   const silence = evaluateSilenceSet(fixtures.silence.cases || []);
   const rhyme = evaluateRhymeSet(fixtures.rhyme.cases || []);
   const timing = evaluateTimingAgreementSet(fixtures.timing.cases || []);
-  const requiredTimingAgreementPct = Number(
-    ((PHASE0_THRESHOLDS.timingAgreementMinMatches / PHASE0_THRESHOLDS.timingAgreementOutOf) * 100).toFixed(1),
-  );
+  const timingGate = getPhase0TimingGate();
 
   const gates = {
     cleanStt: {
@@ -107,9 +115,13 @@ export function summarizePhase0Validation(fixtures) {
       pass: silence.inventedVerses <= PHASE0_THRESHOLDS.silenceInventedVersesMax,
     },
     timingAgreement: {
-      threshold: requiredTimingAgreementPct,
-      actual: timing.agreementPct,
-      pass: timing.agreementPct >= requiredTimingAgreementPct,
+      threshold: `${timingGate.minMatches}/${timingGate.outOf}`,
+      actual: `${timing.matches}/${timing.total}`,
+      thresholdPct: timingGate.minimumPct,
+      actualPct: timing.agreementPct,
+      pass: timing.total >= timingGate.outOf
+        && timing.matches >= timingGate.minMatches
+        && timing.agreementPct >= timingGate.minimumPct,
     },
   };
 

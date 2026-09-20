@@ -43,6 +43,9 @@ const passingFixtures = {
       { humanLabel: "rushed", analyzerLabel: "rushed" },
       { humanLabel: "late", analyzerLabel: "tight" },
       { humanLabel: "tight", analyzerLabel: "tight" },
+      { humanLabel: "tight", analyzerLabel: "late" },
+      { humanLabel: "late", analyzerLabel: "late" },
+      { humanLabel: "rushed", analyzerLabel: "late" },
     ],
   },
 };
@@ -117,6 +120,45 @@ test("Phase 0 launch stays gated when timing agreement is below 5/8", () => {
   });
 
   assert.equal(report.timing.matches, 1);
+  assert.equal(report.gates.timingAgreement.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Timing gate enforces the 5/8 ratio threshold on larger datasets", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    timing: {
+      cases: [
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+      ],
+    },
+  });
+
+  assert.equal(report.timing.matches, 5);
+  assert.equal(report.timing.agreementPct, 50);
+  assert.equal(report.gates.timingAgreement.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Timing gate requires at least 8 labeled comparisons", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    timing: {
+      cases: [{ humanLabel: "tight", analyzerLabel: "tight" }],
+    },
+  });
+
+  assert.equal(report.timing.matches, 1);
+  assert.equal(report.timing.agreementPct, 100);
   assert.equal(report.gates.timingAgreement.pass, false);
   assert.equal(report.launchReady, false);
 });

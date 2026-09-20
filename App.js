@@ -21,7 +21,7 @@ import {
 import * as SpeechTranscriber from "expo-speech-transcriber";
 import { StatusBar } from "expo-status-bar";
 import { analyzeRapText } from "./src/analyzeRap";
-import { PHASE0_THRESHOLDS } from "./src/phase0Validation";
+import { getPhase0TimingGate, PHASE0_THRESHOLDS } from "./src/phase0Validation";
 import { deleteTake, loadTakes, saveTake } from "./src/historyStore";
 
 const PHASE = Object.freeze({
@@ -125,9 +125,7 @@ function GateRow({ label, value, good }) {
   );
 }
 
-const TIMING_GATE_PCT = Math.round(
-  (PHASE0_THRESHOLDS.timingAgreementMinMatches / PHASE0_THRESHOLDS.timingAgreementOutOf) * 100,
-);
+const TIMING_GATE = getPhase0TimingGate();
 
 export default function App() {
   const recorder = useAudioRecorder({
@@ -400,7 +398,7 @@ export default function App() {
           <GateRow label="Silence invented verses" value={`= ${PHASE0_THRESHOLDS.silenceInventedVersesMax}`} good />
           <GateRow
             label="Timing agreement"
-            value={`≥ ${PHASE0_THRESHOLDS.timingAgreementMinMatches}/${PHASE0_THRESHOLDS.timingAgreementOutOf} (~${TIMING_GATE_PCT}%)`}
+            value={`≥ ${TIMING_GATE.minMatches}/${TIMING_GATE.outOf} (~${Math.round(TIMING_GATE.minimumPct)}%)`}
             good
           />
           <Text style={styles.honestyNote}>

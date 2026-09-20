@@ -18,8 +18,18 @@ async function readStoredTakesStrict() {
 function sanitizeTakeScoreInvariant(take) {
   if (!take || typeof take !== "object") return take;
   const currentBarz = take.analysis?.barz || {};
-  const normalizedEvidence = normalizeBarzEvidence(currentBarz.evidence);
-  const nextBarz = buildBarzPhase0(take.analysis || {}, normalizedEvidence, currentBarz.blockedReason);
+  const canonicalEvidenceSource = Array.isArray(take.analysis?.evidence) && take.analysis.evidence.length
+    ? take.analysis.evidence
+    : (Array.isArray(take.analysis?.receipts) && take.analysis.receipts.length
+      ? take.analysis.receipts
+      : currentBarz.evidence);
+  const normalizedEvidence = normalizeBarzEvidence(canonicalEvidenceSource);
+  const blockedReason = currentBarz.status === "withheld"
+    ? (typeof currentBarz.blockedReason === "string" && currentBarz.blockedReason.trim()
+      ? currentBarz.blockedReason.trim()
+      : "Stored take was previously withheld, so BARZ stays withheld until a fresh analysis run.")
+    : currentBarz.blockedReason;
+  const nextBarz = buildBarzPhase0(take.analysis || {}, normalizedEvidence, blockedReason);
 
   return {
     ...take,
