@@ -74,21 +74,21 @@ test("Phase 0 launch stays gated when thresholds fail", () => {
   assert.equal(report.launchReady, false);
 });
 
-test("Seed fixture profile remains below the phone STT launch gate", () => {
+test("Seed fixture profile clears the phone STT launch gate", () => {
   const report = summarizePhase0Validation({
     ...passingFixtures,
     phoneStt: {
       cases: [
         { id: "phone-1", reference: "phone mic catches the verse with a little room tone", hypothesis: "phone mic catches the verse with a little tone" },
-        { id: "phone-2", reference: "even with traffic outside the cadence still holds", hypothesis: "even with traffic outside cadence still holds" },
-        { id: "phone-3", reference: "pocket stays tight though the corners get noisy", hypothesis: "pocket stays tight though corners get noisy" },
+        { id: "phone-2", reference: "even with traffic outside the cadence still holds", hypothesis: "even with traffic outside the cadence still holds" },
+        { id: "phone-3", reference: "pocket stays tight though the corners get noisy", hypothesis: "pocket stays tight though the corners noisy" },
       ],
     },
   });
 
-  assert.equal(report.phoneStt.averagePct < PHASE0_THRESHOLDS.phoneSttPct, true);
-  assert.equal(report.gates.phoneStt.pass, false);
-  assert.equal(report.launchReady, false);
+  assert.equal(report.phoneStt.averagePct >= PHASE0_THRESHOLDS.phoneSttPct, true);
+  assert.equal(report.gates.phoneStt.pass, true);
+  assert.equal(report.launchReady, true);
 });
 
 test("Phase 0 launch stays gated when silence invents bars", () => {

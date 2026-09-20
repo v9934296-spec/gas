@@ -28,4 +28,4 @@ jobs:
         run: npm test
 
       - name: Run Phase 0 trust gates
-        run: npm run validate:phase0
+        run: npm run validate:phase0:launch-ready
