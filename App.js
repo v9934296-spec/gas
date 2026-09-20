@@ -21,6 +21,7 @@ import {
 import * as SpeechTranscriber from "expo-speech-transcriber";
 import { StatusBar } from "expo-status-bar";
 import { analyzeRapText } from "./src/analyzeRap";
+import { PHASE0_THRESHOLDS } from "./src/phase0Validation";
 import { deleteTake, loadTakes, saveTake } from "./src/historyStore";
 
 const PHASE = Object.freeze({
@@ -32,6 +33,22 @@ const PHASE = Object.freeze({
   COMPLETE: "complete",
   ERROR: "error",
 });
+
+const SCREEN = Object.freeze({
+  HOME: "home",
+  BEAT: "beat",
+  RECORD: "record",
+  PROCESSING: "processing",
+  RESULT: "result",
+  RECEIPTS: "receipts",
+  HISTORY: "history",
+});
+
+const BEAT_OPTIONS = Object.freeze([
+  { id: "boom-bap-92", name: "Boom Bap 92", bpm: 92, description: "Wide pocket, slower bar pacing, easiest calibration lane." },
+  { id: "drill-140", name: "Drill 140", bpm: 140, description: "Fast pocket for dense bars and timing stress tests." },
+  { id: "soul-78", name: "Soul 78", bpm: 78, description: "Laid-back phrasing for breath and silence checks." },
+]);
 
 function makeId() {
   return `take-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -49,6 +66,23 @@ function defaultTakeTitle(date = new Date()) {
     hour: "numeric",
     minute: "2-digit",
   })}`;
+}
+
+function getBeatById(id) {
+  return BEAT_OPTIONS.find((item) => item.id === id) || BEAT_OPTIONS[0];
+}
+
+function hydrateTake(take) {
+  if (!take) return take;
+  const beat = getBeatById(take.beat?.id);
+  return {
+    ...take,
+    beat,
+    analysis: analyzeRapText(take.transcript || "", {
+      durationMs: take.durationMs || 0,
+      beat,
+    }),
+  };
 }
 
 function Metric({ value, label }) {
@@ -77,6 +111,15 @@ function MiniButton({ label, onPress, danger = false, disabled = false }) {
   );
 }
 
+function GateRow({ label, value, good }) {
+  return (
+    <View style={styles.gateRow}>
+      <Text style={styles.gateLabel}>{label}</Text>
+      <Text style={[styles.gateValue, good ? styles.goodText : styles.warnText]}>{value}</Text>
+    </View>
+  );
+}
+
 export default function App() {
   const recorder = useAudioRecorder({
     ...RecordingPresets.HIGH_QUALITY,
@@ -84,7 +127,8 @@ export default function App() {
   });
   const recorderState = useAudioRecorderState(recorder, 250);
 
-  const [screen, setScreen] = useState("record");
+  const [screen, setScreen] = useState(SCREEN.HOME);
+  const [historyBackScreen, setHistoryBackScreen] = useState(SCREEN.HOME);
   const [phase, setPhase] = useState(PHASE.IDLE);
   const [transcript, setTranscript] = useState("");
   const [takeTitle, setTakeTitle] = useState("");
@@ -94,8 +138,13 @@ export default function App() {
   const [takes, setTakes] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [savedMessage, setSavedMessage] = useState("");
+  const [selectedBeatId, setSelectedBeatId] = useState(BEAT_OPTIONS[0].id);
 
-  const analysis = useMemo(() => analyzeRapText(transcript), [transcript]);
+  const selectedBeat = useMemo(() => getBeatById(selectedBeatId), [selectedBeatId]);
+  const analysis = useMemo(() => analyzeRapText(transcript, {
+    durationMs: takeDurationMs,
+    beat: selectedBeat,
+  }), [transcript, takeDurationMs, selectedBeat]);
   const busy = [PHASE.PREPARING, PHASE.STOPPING, PHASE.TRANSCRIBING].includes(phase);
   const isRecording = phase === PHASE.RECORDING || recorderState?.isRecording;
 
@@ -103,7 +152,7 @@ export default function App() {
     let mounted = true;
     void loadTakes().then((items) => {
       if (!mounted) return;
-      setTakes(items);
+      setTakes(items.map(hydrateTake));
       setHistoryLoading(false);
     });
     return () => {
@@ -120,13 +169,25 @@ export default function App() {
 
     if (Platform.OS === "ios") {
       const speech = await SpeechTranscriber.requestPermissions();
-      if (speech !== "authorized") {
+      const speechAuthorized = speech === "authorized"
+        || speech?.status === "authorized"
+        || speech?.granted === true;
+      if (!speechAuthorized) {
         Alert.alert("Speech recognition required", "Allow speech recognition so Rap Lab can transcribe your verse locally on this device.");
         return false;
       }
     }
 
     return true;
+  }
+
+  function openHistory(fromScreen = screen) {
+    setHistoryBackScreen(fromScreen);
+    setScreen(SCREEN.HISTORY);
+  }
+
+  function openBeatSelect() {
+    setScreen(SCREEN.BEAT);
   }
 
   async function startRecording() {
@@ -140,6 +201,7 @@ export default function App() {
       setCurrentTakeId(null);
       setTakeDurationMs(0);
       setPhase(PHASE.PREPARING);
+      setScreen(SCREEN.RECORD);
 
       const allowed = await ensurePermissions();
       if (!allowed) {
@@ -152,12 +214,13 @@ export default function App() {
         playsInSilentMode: true,
       });
       await recorder.prepareToRecordAsync();
-      recorder.record();
+      await recorder.record();
       setPhase(PHASE.RECORDING);
     } catch (error) {
       console.error("START_RECORDING_FAILED", error);
       setErrorMessage(error instanceof Error ? error.message : "Could not start recording.");
       setPhase(PHASE.ERROR);
+      setScreen(SCREEN.RECORD);
     }
   }
 
@@ -166,10 +229,11 @@ export default function App() {
 
     try {
       setPhase(PHASE.STOPPING);
-      const capturedDuration = recorderState?.durationMillis || 0;
-      await recorder.stop();
-      const uri = recorder.uri;
-      setTakeDurationMs(capturedDuration);
+      setScreen(SCREEN.PROCESSING);
+      const stoppedRecording = await recorder.stop();
+      const finalDurationMs = stoppedRecording?.durationMillis || recorderState?.durationMillis || 0;
+      const uri = stoppedRecording?.uri || recorder.uri;
+      setTakeDurationMs(finalDurationMs);
 
       await setAudioModeAsync({
         allowsRecording: false,
@@ -182,8 +246,13 @@ export default function App() {
       }
 
       setPhase(PHASE.TRANSCRIBING);
-      const text = await SpeechTranscriber.transcribeAudioWithSFRecognizer(uri);
-      const cleaned = typeof text === "string" ? text.trim() : "";
+      const transcription = await SpeechTranscriber.transcribeAudioWithSFRecognizer(uri);
+      const rawText = typeof transcription === "string"
+        ? transcription
+        : typeof transcription?.transcript === "string"
+          ? transcription.transcript
+          : "";
+      const cleaned = rawText.trim();
 
       if (!cleaned) {
         throw new Error("No speech was confidently detected. Try another take closer to the microphone.");
@@ -192,12 +261,13 @@ export default function App() {
       setTranscript(cleaned);
       setTakeTitle(defaultTakeTitle());
       setCurrentTakeId(makeId());
-      setScreen("result");
       setPhase(PHASE.COMPLETE);
+      setScreen(SCREEN.RESULT);
     } catch (error) {
       console.error("STOP_OR_TRANSCRIBE_FAILED", error);
       setErrorMessage(error instanceof Error ? error.message : "The take could not be transcribed.");
       setPhase(PHASE.ERROR);
+      setScreen(SCREEN.RECORD);
       try {
         await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       } catch {
@@ -215,7 +285,7 @@ export default function App() {
     setErrorMessage("");
     setSavedMessage("");
     setPhase(PHASE.IDLE);
-    setScreen("record");
+    setScreen(SCREEN.RECORD);
   }
 
   async function persistCurrentTake() {
@@ -228,15 +298,16 @@ export default function App() {
       title: takeTitle.trim() || defaultTakeTitle(now),
       transcript: transcript.trim(),
       durationMs: takeDurationMs,
+      beat: selectedBeat,
       createdAt: takes.find((item) => item.id === id)?.createdAt || now.toISOString(),
       updatedAt: now.toISOString(),
-      analysis: analyzeRapText(transcript),
+      analysis,
     };
 
     try {
       const next = await saveTake(take);
       setCurrentTakeId(id);
-      setTakes(next);
+      setTakes(next.map(hydrateTake));
       setSavedMessage("Saved on this device");
     } catch (error) {
       Alert.alert("Could not save take", error instanceof Error ? error.message : "Local storage failed.");
@@ -244,27 +315,32 @@ export default function App() {
   }
 
   function openTake(take) {
-    setCurrentTakeId(take.id);
-    setTakeTitle(take.title || "Saved take");
-    setTranscript(take.transcript || "");
-    setTakeDurationMs(take.durationMs || 0);
+    const hydrated = hydrateTake(take);
+    setCurrentTakeId(hydrated.id);
+    setTakeTitle(hydrated.title || "Saved take");
+    setTranscript(hydrated.transcript || "");
+    setTakeDurationMs(hydrated.durationMs || 0);
+    setSelectedBeatId(hydrated.beat?.id || BEAT_OPTIONS[0].id);
     setSavedMessage("Saved on this device");
     setErrorMessage("");
     setPhase(PHASE.COMPLETE);
-    setScreen("result");
+    setScreen(SCREEN.RESULT);
   }
 
   function confirmDelete(take) {
-    Alert.alert("Delete this take?", "The transcript and analysis will be removed from this device.", [
+    Alert.alert("Delete this take?", "The transcript, receipts, and analysis will be removed from this device.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
-        onPress: () => {
-          void deleteTake(take.id).then((next) => {
-            setTakes(next);
+        onPress: async () => {
+          try {
+            const next = await deleteTake(take.id);
+            setTakes(next.map(hydrateTake));
             if (currentTakeId === take.id) resetForNewTake();
-          });
+          } catch (error) {
+            Alert.alert("Could not delete take", error instanceof Error ? error.message : "Local storage failed.");
+          }
         },
       },
     ]);
@@ -277,9 +353,9 @@ export default function App() {
       case PHASE.RECORDING:
         return "RECORDING";
       case PHASE.STOPPING:
-        return "FINISHING TAKE";
+        return "CAPTURING TAKE";
       case PHASE.TRANSCRIBING:
-        return "TRANSCRIBING ON DEVICE";
+        return "BUILDING RECEIPTS";
       case PHASE.ERROR:
         return "TAKE FAILED";
       default:
@@ -287,18 +363,89 @@ export default function App() {
     }
   }
 
+  function renderHome() {
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.eyebrow}>BARZ PHASE 0</Text>
+            <Text style={styles.logo}>RAP LAB</Text>
+          </View>
+          <MiniButton label={`PROGRESS ${takes.length ? `(${takes.length})` : ""}`} onPress={() => openHistory(SCREEN.HOME)} />
+        </View>
+
+        <Text style={styles.heroCopy}>No score without evidence. Every result needs deterministic receipts with timestamps, lyric spans, and metric reasons before BARZ can score.</Text>
+
+        <View style={styles.infoCard}>
+          <Text style={styles.cardKicker}>7 CORE SURFACES</Text>
+          <Text style={styles.cardTitle}>Home → Beat Select → Record → Processing → Result → Receipts → Progress / History</Text>
+          <Text style={styles.cardCopy}>This build keeps the product surface area narrow while the validation harness proves transcription, silence detection, rhyme precision, and reviewer timing agreement.</Text>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.cardKicker}>V1 LAUNCH GATES</Text>
+          <GateRow label="Clean STT" value={`≥ ${PHASE0_THRESHOLDS.cleanSttPct}%`} good />
+          <GateRow label="Phone STT" value={`≥ ${PHASE0_THRESHOLDS.phoneSttPct}%`} good />
+          <GateRow label="Obvious rhyme precision" value={`≥ ${PHASE0_THRESHOLDS.rhymePrecisionPct}%`} good />
+          <GateRow label="Fake rhyme rate" value={`≤ ${PHASE0_THRESHOLDS.fakeRhymeRatePct}%`} good />
+        </View>
+
+        <Pressable onPress={openBeatSelect} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+          <Text style={styles.primaryButtonText}>START PHASE 0 FLOW</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
+  function renderBeatSelect() {
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.eyebrow}>SURFACE 2 / 7</Text>
+            <Text style={styles.logo}>BEAT SELECT</Text>
+          </View>
+          <MiniButton label="BACK" onPress={() => setScreen(SCREEN.HOME)} />
+        </View>
+
+        <Text style={styles.heroCopy}>Pick the beat lane first so timing evidence can be judged against an explicit BPM target.</Text>
+
+        <View style={styles.historyList}>
+          {BEAT_OPTIONS.map((beat) => {
+            const selected = beat.id === selectedBeat.id;
+            return (
+              <Pressable
+                key={beat.id}
+                onPress={() => setSelectedBeatId(beat.id)}
+                style={({ pressed }) => [styles.beatCard, selected && styles.beatCardActive, pressed && styles.pressed]}
+              >
+                <Text style={styles.historyTitle}>{beat.name}</Text>
+                <Text style={styles.historyMeta}>{beat.bpm} BPM</Text>
+                <Text style={styles.cardCopy}>{beat.description}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable onPress={() => setScreen(SCREEN.RECORD)} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+          <Text style={styles.primaryButtonText}>CONTINUE TO RECORD</Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
   function renderRecord() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.eyebrow}>PERSONAL RAP LAB</Text>
-            <Text style={styles.logo}>RAP LAB</Text>
+            <Text style={styles.eyebrow}>SURFACE 3 / 7</Text>
+            <Text style={styles.logo}>RECORD</Text>
           </View>
-          <MiniButton label={`HISTORY ${takes.length ? `(${takes.length})` : ""}`} onPress={() => setScreen("history")} />
+          <MiniButton label="CHANGE BEAT" onPress={openBeatSelect} />
         </View>
 
-        <Text style={styles.heroCopy}>Record a verse. Get the transcript. See measurable writing patterns without fake AI scores.</Text>
+        <Text style={styles.heroCopy}>Selected beat: {selectedBeat.name} · {selectedBeat.bpm} BPM. Timestamps and cadence evidence are measured against this lane.</Text>
 
         <View style={styles.statusCard}>
           <View style={[styles.statusDot, isRecording && styles.statusDotRecording]} />
@@ -321,7 +468,7 @@ export default function App() {
             <View style={[styles.recordCore, isRecording && styles.stopCore]} />
             <Text style={styles.recordButtonLabel}>{isRecording ? "STOP" : "RECORD"}</Text>
           </Pressable>
-          <Text style={styles.recordHint}>{isRecording ? "Finish the take when you're ready." : "Best results: one voice, low background noise, under one minute."}</Text>
+          <Text style={styles.recordHint}>{isRecording ? "Finish the take when you have a full bar set." : "Phase 0 cares about transcript evidence first: clear voice, low noise, under one minute."}</Text>
         </View>
 
         {phase === PHASE.ERROR ? (
@@ -333,10 +480,28 @@ export default function App() {
         ) : null}
 
         <View style={styles.infoCard}>
-          <Text style={styles.cardKicker}>WHAT THIS VERSION MEASURES</Text>
-          <Text style={styles.cardTitle}>Writing structure first.</Text>
-          <Text style={styles.cardCopy}>Word count, estimated syllables, vocabulary variety, repeated language, end-rhyme candidates, internal-rhyme candidates, and rhyme density.</Text>
-          <Text style={styles.honestyNote}>Flow timing, beat alignment, and true phonetic rhyme scoring are not claimed yet.</Text>
+          <Text style={styles.cardKicker}>PIPELINE ORDER</Text>
+          <Text style={styles.cardCopy}>Record + beat + timestamps → deterministic rhyme/timing/silence analyzers → evidence objects → scoring rules from evidence only → coaching phrasing later.</Text>
+          <Text style={styles.honestyNote}>This build does not let an LLM score a take. Coaching language must come from receipts, never from raw scoring guesses.</Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  function renderProcessing() {
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.eyebrow}>SURFACE 4 / 7</Text>
+            <Text style={styles.logo}>PROCESSING</Text>
+          </View>
+        </View>
+        <View style={styles.infoCard}>
+          <ActivityIndicator color="#54FF00" size="large" />
+          <Text style={styles.cardTitle}>Building evidence receipts</Text>
+          <Text style={styles.cardCopy}>We only show a BARZ score after the deterministic analyzers can attach transcript-backed evidence objects.</Text>
+          <Text style={styles.honestyNote}>{statusText()} · Beat target {selectedBeat.bpm} BPM</Text>
         </View>
       </ScrollView>
     );
@@ -344,11 +509,12 @@ export default function App() {
 
   function renderResult() {
     const repetitions = analysis.repeatedWords || [];
+    const barz = analysis.barz;
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>TAKE ANALYSIS</Text>
+            <Text style={styles.eyebrow}>SURFACE 5 / 7</Text>
             <TextInput
               value={takeTitle}
               onChangeText={(value) => {
@@ -359,7 +525,7 @@ export default function App() {
               placeholderTextColor="#66666B"
               style={styles.titleInput}
             />
-            <Text style={styles.resultMeta}>{formatDuration(takeDurationMs)} {savedMessage ? `· ${savedMessage}` : ""}</Text>
+            <Text style={styles.resultMeta}>{formatDuration(takeDurationMs)} · {selectedBeat.name} · {savedMessage || "Unsaved"}</Text>
           </View>
           <MiniButton label="NEW TAKE" onPress={resetForNewTake} />
         </View>
@@ -369,8 +535,21 @@ export default function App() {
           <Metric value={analysis.estimatedSyllables} label="EST. SYLLABLES" />
           <Metric value={`${analysis.vocabularyVarietyPct}%`} label="VOCAB VARIETY" />
           <Metric value={`${analysis.rhymeDensityPct}%`} label="RHYME DENSITY" />
-          <Metric value={analysis.endRhymeCandidates} label="END-RHYME CANDIDATES" />
-          <Metric value={analysis.internalRhymeCandidates} label="INTERNAL CANDIDATES" />
+          <Metric value={`${analysis.timingAgreementPct}%`} label="TIMING AGREEMENT" />
+          <Metric value={typeof barz.score === "number" ? barz.score : "—"} label="BARZ PHASE 0" />
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.cardKicker}>SCORING RULE</Text>
+          <Text style={styles.cardTitle}>No score without evidence.</Text>
+          <Text style={styles.cardCopy}>{barz.note}</Text>
+          <Text style={styles.sectionLine}>Status: <Text style={styles.sectionStrong}>{barz.status.toUpperCase()}</Text></Text>
+          <Text style={styles.sectionLine}>Evidence receipts: <Text style={styles.sectionStrong}>{barz.evidence.length}</Text></Text>
+          {typeof barz.score === "number" ? (
+            <Text style={styles.sectionLine}>Score: <Text style={styles.sectionStrong}>{barz.score}</Text></Text>
+          ) : (
+            <Text style={styles.sectionLine}>{barz.blockedReason || "Score withheld."}</Text>
+          )}
         </View>
 
         <View style={styles.sectionCard}>
@@ -397,7 +576,7 @@ export default function App() {
 
         <View style={styles.sectionCard}>
           <Text style={styles.cardKicker}>EDIT THE TRANSCRIPT</Text>
-          <Text style={styles.cardCopy}>Fix recognition mistakes or add line breaks. The metrics update immediately.</Text>
+          <Text style={styles.cardCopy}>Fix recognition mistakes or add line breaks. Receipts and scores update from the deterministic analyzers.</Text>
           <TextInput
             multiline
             value={transcript}
@@ -420,7 +599,41 @@ export default function App() {
         <Pressable onPress={persistCurrentTake} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
           <Text style={styles.primaryButtonText}>{savedMessage ? "SAVE CHANGES" : "SAVE TAKE"}</Text>
         </Pressable>
-        <MiniButton label="OPEN HISTORY" onPress={() => setScreen("history")} />
+        <MiniButton label="OPEN RECEIPTS" onPress={() => setScreen(SCREEN.RECEIPTS)} />
+        <MiniButton label="OPEN PROGRESS / HISTORY" onPress={() => openHistory(SCREEN.RESULT)} />
+      </ScrollView>
+    );
+  }
+
+  function renderReceipts() {
+    const receipts = analysis.barz.evidence;
+    return (
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.eyebrow}>SURFACE 6 / 7</Text>
+            <Text style={styles.logo}>RECEIPTS</Text>
+          </View>
+          <MiniButton label="BACK" onPress={() => setScreen(SCREEN.RESULT)} />
+        </View>
+
+        <Text style={styles.heroCopy}>Every BARZ decision must point to a timestamp, a lyric span, and a metric reason.</Text>
+
+        {receipts.length ? receipts.map((item) => (
+          <View key={item.id} style={styles.sectionCard}>
+            <Text style={styles.cardKicker}>{item.category.toUpperCase()}</Text>
+            <Text style={styles.cardTitle}>{item.metric}</Text>
+            <Text style={styles.cardCopy}>{item.reason}</Text>
+            <Text style={styles.sectionLine}>Timestamp: <Text style={styles.sectionStrong}>{formatDuration(item.timestamp.startMs)} → {formatDuration(item.timestamp.endMs)}</Text></Text>
+            <Text style={styles.sectionLine}>Lyric span: <Text style={styles.sectionStrong}>{item.lyricSpan.text}</Text></Text>
+            <Text style={styles.sectionLine}>Points: <Text style={styles.sectionStrong}>{item.points}</Text></Text>
+          </View>
+        )) : (
+          <View style={styles.infoCard}>
+            <Text style={styles.cardTitle}>No receipts available.</Text>
+            <Text style={styles.cardCopy}>{analysis.barz.blockedReason || "Without explicit evidence objects, the score remains hidden."}</Text>
+          </View>
+        )}
       </ScrollView>
     );
   }
@@ -430,20 +643,29 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.eyebrow}>LOCAL LIBRARY</Text>
-            <Text style={styles.logo}>HISTORY</Text>
+            <Text style={styles.eyebrow}>SURFACE 7 / 7</Text>
+            <Text style={styles.logo}>PROGRESS / HISTORY</Text>
           </View>
-          <MiniButton label="BACK" onPress={() => setScreen(currentTakeId ? "result" : "record")} />
+          <MiniButton label="BACK" onPress={() => setScreen(historyBackScreen)} />
         </View>
 
-        <Text style={styles.heroCopy}>Saved only on this device. No account and no cloud backend in this personal build.</Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.cardKicker}>LAUNCH GATES</Text>
+          <Text style={styles.cardCopy}>Keep V1 gated until the validation harness consistently clears the thresholds below with real clean and phone recordings.</Text>
+          <GateRow label="Clean STT" value={`≥ ${PHASE0_THRESHOLDS.cleanSttPct}%`} good />
+          <GateRow label="Phone STT" value={`≥ ${PHASE0_THRESHOLDS.phoneSttPct}%`} good />
+          <GateRow label="Obvious rhyme precision" value={`≥ ${PHASE0_THRESHOLDS.rhymePrecisionPct}%`} good />
+          <GateRow label="Fake rhyme rate" value={`≤ ${PHASE0_THRESHOLDS.fakeRhymeRatePct}%`} good />
+        </View>
+
+        <Text style={styles.heroCopy}>Saved only on this device. No account and no cloud backend in this build.</Text>
 
         {historyLoading ? (
           <ActivityIndicator color="#54FF00" />
         ) : takes.length === 0 ? (
           <View style={styles.infoCard}>
             <Text style={styles.cardTitle}>No saved takes yet.</Text>
-            <Text style={styles.cardCopy}>Record a verse, review the transcript, then tap Save Take.</Text>
+            <Text style={styles.cardCopy}>Record a verse, review the transcript, inspect the receipts, then tap Save Take.</Text>
           </View>
         ) : (
           <View style={styles.historyList}>
@@ -451,9 +673,7 @@ export default function App() {
               <View key={take.id} style={styles.historyCard}>
                 <Pressable onPress={() => openTake(take)} style={({ pressed }) => [styles.historyMain, pressed && styles.pressed]}>
                   <Text style={styles.historyTitle}>{take.title || "Saved take"}</Text>
-                  <Text style={styles.historyMeta}>
-                    {take.analysis?.wordCount ?? analyzeRapText(take.transcript || "").wordCount} words · {formatDuration(take.durationMs || 0)}
-                  </Text>
+                  <Text style={styles.historyMeta}>{take.beat?.name || BEAT_OPTIONS[0].name} · {take.analysis?.wordCount ?? 0} words · {formatDuration(take.durationMs || 0)}</Text>
                   <Text style={styles.historyPreview} numberOfLines={2}>{take.transcript}</Text>
                 </Pressable>
                 <MiniButton label="DELETE" danger onPress={() => confirmDelete(take)} />
@@ -468,7 +688,19 @@ export default function App() {
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="light" />
-      {screen === "record" ? renderRecord() : screen === "history" ? renderHistory() : renderResult()}
+      {screen === SCREEN.HOME
+        ? renderHome()
+        : screen === SCREEN.BEAT
+          ? renderBeatSelect()
+          : screen === SCREEN.RECORD
+            ? renderRecord()
+            : screen === SCREEN.PROCESSING
+              ? renderProcessing()
+              : screen === SCREEN.RECEIPTS
+                ? renderReceipts()
+                : screen === SCREEN.HISTORY
+                  ? renderHistory()
+                  : renderResult()}
     </SafeAreaView>
   );
 }
@@ -478,7 +710,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 22, paddingTop: 24, paddingBottom: 48, gap: 18 },
   topRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
   eyebrow: { color: "#54FF00", fontSize: 10, fontWeight: "900", letterSpacing: 2.2 },
-  logo: { color: "#FFFFFF", fontSize: 36, fontWeight: "900", letterSpacing: -1.2, marginTop: 2 },
+  logo: { color: "#FFFFFF", fontSize: 34, fontWeight: "900", letterSpacing: -1.2, marginTop: 2 },
   heroCopy: { color: "#A3A3A8", fontSize: 16, lineHeight: 24, maxWidth: 720 },
   statusCard: { minHeight: 54, borderRadius: 14, backgroundColor: "#151517", flexDirection: "row", alignItems: "center", paddingHorizontal: 16, borderWidth: 1, borderColor: "#242427" },
   statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#54FF00", marginRight: 10 },
@@ -493,7 +725,9 @@ const styles = StyleSheet.create({
   stopCore: { borderRadius: 8, backgroundColor: "#FF3154" },
   recordButtonLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "900", letterSpacing: 2, marginTop: 12 },
   recordHint: { color: "#737378", fontSize: 13, textAlign: "center", marginTop: 16, maxWidth: 420 },
-  infoCard: { borderRadius: 18, backgroundColor: "#151517", padding: 20, borderWidth: 1, borderColor: "#242427" },
+  infoCard: { borderRadius: 18, backgroundColor: "#151517", padding: 20, borderWidth: 1, borderColor: "#242427", gap: 10 },
+  beatCard: { borderRadius: 18, backgroundColor: "#151517", padding: 18, borderWidth: 1, borderColor: "#242427" },
+  beatCardActive: { borderColor: "#54FF00", backgroundColor: "#111A0F" },
   errorCard: { borderRadius: 18, backgroundColor: "#211216", padding: 20, borderLeftWidth: 3, borderLeftColor: "#FF3154", gap: 12 },
   errorTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" },
   errorText: { color: "#BBBBBF", fontSize: 14, lineHeight: 21 },
@@ -527,6 +761,11 @@ const styles = StyleSheet.create({
   historyTitle: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
   historyMeta: { color: "#54FF00", fontSize: 11, fontWeight: "800", marginTop: 4 },
   historyPreview: { color: "#85858A", fontSize: 13, lineHeight: 19, marginTop: 8 },
+  gateRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 },
+  gateLabel: { color: "#9B9BA0", fontSize: 14 },
+  gateValue: { fontSize: 14, fontWeight: "900" },
+  goodText: { color: "#54FF00" },
+  warnText: { color: "#FFBB54" },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
 });

@@ -1,0 +1,15 @@
+{
+  "cases": [
+    { "id": "rhyme-1", "obviousRhyme": true, "detectedAsRhyme": true },
+    { "id": "rhyme-2", "obviousRhyme": true, "detectedAsRhyme": true },
+    { "id": "rhyme-3", "obviousRhyme": true, "detectedAsRhyme": true },
+    { "id": "rhyme-4", "obviousRhyme": true, "detectedAsRhyme": true },
+    { "id": "rhyme-5", "obviousRhyme": false, "detectedAsRhyme": true },
+    { "id": "rhyme-6", "obviousRhyme": false, "detectedAsRhyme": false },
+    { "id": "rhyme-7", "obviousRhyme": false, "detectedAsRhyme": false },
+    { "id": "rhyme-8", "obviousRhyme": false, "detectedAsRhyme": false },
+    { "id": "rhyme-9", "obviousRhyme": false, "detectedAsRhyme": false },
+    { "id": "rhyme-10", "obviousRhyme": false, "detectedAsRhyme": false },
+    { "id": "rhyme-11", "obviousRhyme": false, "detectedAsRhyme": false }
+  ]
+}

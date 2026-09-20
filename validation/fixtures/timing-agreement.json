@@ -1,0 +1,9 @@
+{
+  "cases": [
+    { "id": "timing-1", "humanLabel": "tight", "analyzerLabel": "tight" },
+    { "id": "timing-2", "humanLabel": "tight", "analyzerLabel": "tight" },
+    { "id": "timing-3", "humanLabel": "late", "analyzerLabel": "late" },
+    { "id": "timing-4", "humanLabel": "rushed", "analyzerLabel": "rushed" },
+    { "id": "timing-5", "humanLabel": "late", "analyzerLabel": "tight" }
+  ]
+}
