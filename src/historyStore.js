@@ -30,7 +30,11 @@ export function sanitizeTakeScoreInvariant(take) {
       : "Stored take was previously withheld, so BARZ stays withheld until a fresh analysis run.")
     : currentBarz.blockedReason;
   const nextBarz = typeof currentBarz.status === "string"
-    ? currentBarz
+    ? {
+      ...currentBarz,
+      blockedReason,
+      evidence: currentBarz.status === "scored" ? normalizedEvidence : [],
+    }
     : buildBarzPhase0(take.analysis || {}, normalizedEvidence, blockedReason);
 
   return {

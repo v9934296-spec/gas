@@ -35,6 +35,7 @@ test("sanitizeTakeScoreInvariant preserves persisted BARZ results", () => {
   assert.equal(sanitized.analysis.barz.score, 73);
   assert.equal(sanitized.analysis.barz.note, "Persisted score should not change on reload.");
   assert.deepEqual(sanitized.analysis.evidence, sanitized.analysis.receipts);
+  assert.deepEqual(sanitized.analysis.barz.evidence, sanitized.analysis.evidence);
   assert.equal(sanitized.analysis.receipts[0].source, "deterministic");
 });
 
