@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { buildBarzPhase0, normalizeBarzEvidence } from "./analyzeRap";
+import { buildBarzPhase0, normalizeBarzEvidence } from "./analyzeRap.js";
 
 const STORAGE_KEY = "raplab:takes:v1";
 let mutationQueue = Promise.resolve();
@@ -15,7 +15,7 @@ async function readStoredTakesStrict() {
   return parsed.map(sanitizeTakeScoreInvariant);
 }
 
-function sanitizeTakeScoreInvariant(take) {
+export function sanitizeTakeScoreInvariant(take) {
   if (!take || typeof take !== "object") return take;
   const currentBarz = take.analysis?.barz || {};
   const canonicalEvidenceSource = Array.isArray(take.analysis?.evidence) && take.analysis.evidence.length
@@ -29,7 +29,9 @@ function sanitizeTakeScoreInvariant(take) {
       ? currentBarz.blockedReason.trim()
       : "Stored take was previously withheld, so BARZ stays withheld until a fresh analysis run.")
     : currentBarz.blockedReason;
-  const nextBarz = buildBarzPhase0(take.analysis || {}, normalizedEvidence, blockedReason);
+  const nextBarz = typeof currentBarz.status === "string"
+    ? currentBarz
+    : buildBarzPhase0(take.analysis || {}, normalizedEvidence, blockedReason);
 
   return {
     ...take,
