@@ -22,8 +22,13 @@ export function sanitizeTakeScoreInvariant(take) {
     ? take.analysis.evidence
     : (Array.isArray(take.analysis?.receipts) && take.analysis.receipts.length
       ? take.analysis.receipts
-      : currentBarz.evidence);
+      : []);
   const normalizedEvidence = normalizeBarzEvidence(canonicalEvidenceSource);
+  const normalizedBarzEvidence = normalizeBarzEvidence(
+    Array.isArray(currentBarz.evidence) && currentBarz.evidence.length
+      ? currentBarz.evidence
+      : canonicalEvidenceSource,
+  );
   const blockedReason = currentBarz.status === "withheld"
     ? (typeof currentBarz.blockedReason === "string" && currentBarz.blockedReason.trim()
       ? currentBarz.blockedReason.trim()
@@ -33,7 +38,7 @@ export function sanitizeTakeScoreInvariant(take) {
     ? {
       ...currentBarz,
       blockedReason,
-      evidence: currentBarz.status === "scored" ? normalizedEvidence : [],
+      evidence: currentBarz.status === "scored" ? normalizedBarzEvidence : [],
     }
     : buildBarzPhase0(take.analysis || {}, normalizedEvidence, blockedReason);
 

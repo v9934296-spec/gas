@@ -51,3 +51,28 @@ test("sanitizeTakeScoreInvariant backfills BARZ when stored data is missing it",
   assert.equal(sanitized.analysis.barz.score, 8);
   assert.deepEqual(sanitized.analysis.barz.evidence, sanitized.analysis.evidence);
 });
+
+test("sanitizeTakeScoreInvariant keeps BARZ-only evidence out of top-level receipts", () => {
+  const take = {
+    id: "take-3",
+    analysis: {
+      barz: {
+        phase: "BARZ Phase 0",
+        status: "scored",
+        score: 73,
+        evidence,
+      },
+    },
+  };
+
+  const sanitized = sanitizeTakeScoreInvariant(take);
+
+  assert.deepEqual(sanitized.analysis.evidence, []);
+  assert.deepEqual(sanitized.analysis.receipts, []);
+  assert.deepEqual(sanitized.analysis.barz.evidence, [
+    {
+      ...evidence[0],
+      source: "deterministic",
+    },
+  ]);
+});
