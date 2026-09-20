@@ -55,6 +55,10 @@ test("Phase 0 validation summary can clear launch gates", () => {
   assert.ok(report.phoneStt.averagePct >= PHASE0_THRESHOLDS.phoneSttPct);
   assert.ok(report.rhyme.obviousRhymePrecisionPct >= PHASE0_THRESHOLDS.rhymePrecisionPct);
   assert.ok(report.rhyme.fakeRhymeRatePct <= PHASE0_THRESHOLDS.fakeRhymeRatePct);
+  assert.equal(report.silence.inventedVerses, 0);
+  assert.ok(report.timing.agreementPct >= 62.5);
+  assert.equal(report.gates.silenceInventedVerses.pass, true);
+  assert.equal(report.gates.timingAgreement.pass, true);
   assert.equal(report.launchReady, true);
 });
 
@@ -80,5 +84,39 @@ test("Seed fixture profile remains below the phone STT launch gate", () => {
   });
 
   assert.equal(report.phoneStt.averagePct < PHASE0_THRESHOLDS.phoneSttPct, true);
+  assert.equal(report.gates.phoneStt.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Phase 0 launch stays gated when silence invents bars", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    silence: {
+      cases: [
+        { expectedNoBars: true, detectedNoBars: false },
+        { expectedNoBars: true, detectedNoBars: true },
+      ],
+    },
+  });
+
+  assert.equal(report.silence.inventedVerses, 1);
+  assert.equal(report.gates.silenceInventedVerses.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Phase 0 launch stays gated when timing agreement is below 5/8", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    timing: {
+      cases: [
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "rushed", analyzerLabel: "tight" },
+      ],
+    },
+  });
+
+  assert.equal(report.timing.matches, 1);
+  assert.equal(report.gates.timingAgreement.pass, false);
   assert.equal(report.launchReady, false);
 });

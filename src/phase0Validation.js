@@ -3,6 +3,9 @@ export const PHASE0_THRESHOLDS = Object.freeze({
   phoneSttPct: 78,
   rhymePrecisionPct: 80,
   fakeRhymeRatePct: 15,
+  silenceInventedVersesMax: 0,
+  timingAgreementMinMatches: 5,
+  timingAgreementOutOf: 8,
 });
 
 function tokenize(text) {
@@ -35,9 +38,10 @@ export function evaluateSttSet(cases) {
 }
 
 export function evaluateSilenceSet(cases) {
+  const inventedVerses = cases.filter((item) => item.expectedNoBars && !item.detectedNoBars).length;
   const matches = cases.filter((item) => item.expectedNoBars === item.detectedNoBars).length;
   const agreementPct = cases.length ? Number(((matches / cases.length) * 100).toFixed(1)) : 0;
-  return { total: cases.length, agreementPct };
+  return { total: cases.length, agreementPct, inventedVerses };
 }
 
 export function evaluateRhymeSet(cases) {
@@ -63,7 +67,7 @@ export function evaluateRhymeSet(cases) {
 export function evaluateTimingAgreementSet(cases) {
   const matches = cases.filter((item) => item.humanLabel === item.analyzerLabel).length;
   const agreementPct = cases.length ? Number(((matches / cases.length) * 100).toFixed(1)) : 0;
-  return { total: cases.length, agreementPct };
+  return { total: cases.length, matches, agreementPct };
 }
 
 export function summarizePhase0Validation(fixtures) {
@@ -72,14 +76,48 @@ export function summarizePhase0Validation(fixtures) {
   const silence = evaluateSilenceSet(fixtures.silence.cases || []);
   const rhyme = evaluateRhymeSet(fixtures.rhyme.cases || []);
   const timing = evaluateTimingAgreementSet(fixtures.timing.cases || []);
+  const requiredTimingAgreementPct = Number(
+    ((PHASE0_THRESHOLDS.timingAgreementMinMatches / PHASE0_THRESHOLDS.timingAgreementOutOf) * 100).toFixed(1),
+  );
 
-  const launchReady = cleanStt.averagePct >= PHASE0_THRESHOLDS.cleanSttPct
-    && phoneStt.averagePct >= PHASE0_THRESHOLDS.phoneSttPct
-    && rhyme.obviousRhymePrecisionPct >= PHASE0_THRESHOLDS.rhymePrecisionPct
-    && rhyme.fakeRhymeRatePct <= PHASE0_THRESHOLDS.fakeRhymeRatePct;
+  const gates = {
+    cleanStt: {
+      threshold: PHASE0_THRESHOLDS.cleanSttPct,
+      actual: cleanStt.averagePct,
+      pass: cleanStt.averagePct >= PHASE0_THRESHOLDS.cleanSttPct,
+    },
+    phoneStt: {
+      threshold: PHASE0_THRESHOLDS.phoneSttPct,
+      actual: phoneStt.averagePct,
+      pass: phoneStt.averagePct >= PHASE0_THRESHOLDS.phoneSttPct,
+    },
+    rhymePrecision: {
+      threshold: PHASE0_THRESHOLDS.rhymePrecisionPct,
+      actual: rhyme.obviousRhymePrecisionPct,
+      pass: rhyme.obviousRhymePrecisionPct >= PHASE0_THRESHOLDS.rhymePrecisionPct,
+    },
+    fakeRhymeRate: {
+      threshold: PHASE0_THRESHOLDS.fakeRhymeRatePct,
+      actual: rhyme.fakeRhymeRatePct,
+      pass: rhyme.fakeRhymeRatePct <= PHASE0_THRESHOLDS.fakeRhymeRatePct,
+    },
+    silenceInventedVerses: {
+      threshold: PHASE0_THRESHOLDS.silenceInventedVersesMax,
+      actual: silence.inventedVerses,
+      pass: silence.inventedVerses <= PHASE0_THRESHOLDS.silenceInventedVersesMax,
+    },
+    timingAgreement: {
+      threshold: requiredTimingAgreementPct,
+      actual: timing.agreementPct,
+      pass: timing.agreementPct >= requiredTimingAgreementPct,
+    },
+  };
+
+  const launchReady = Object.values(gates).every((gate) => gate.pass);
 
   return {
     thresholds: PHASE0_THRESHOLDS,
+    gates,
     cleanStt,
     phoneStt,
     silence,

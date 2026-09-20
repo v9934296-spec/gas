@@ -44,6 +44,11 @@ const SCREEN = Object.freeze({
   HISTORY: "history",
 });
 
+const TRUST_GATE_FLAGS = Object.freeze({
+  social: false,
+  battle: false,
+});
+
 const BEAT_OPTIONS = Object.freeze([
   { id: "boom-bap-92", name: "Boom Bap 92", bpm: 92, description: "Wide pocket, slower bar pacing, easiest calibration lane." },
   { id: "drill-140", name: "Drill 140", bpm: 140, description: "Fast pocket for dense bars and timing stress tests." },
@@ -119,6 +124,10 @@ function GateRow({ label, value, good }) {
     </View>
   );
 }
+
+const TIMING_GATE_PCT = Math.round(
+  (PHASE0_THRESHOLDS.timingAgreementMinMatches / PHASE0_THRESHOLDS.timingAgreementOutOf) * 100,
+);
 
 export default function App() {
   const recorder = useAudioRecorder({
@@ -388,6 +397,16 @@ export default function App() {
           <GateRow label="Phone STT" value={`≥ ${PHASE0_THRESHOLDS.phoneSttPct}%`} good />
           <GateRow label="Obvious rhyme precision" value={`≥ ${PHASE0_THRESHOLDS.rhymePrecisionPct}%`} good />
           <GateRow label="Fake rhyme rate" value={`≤ ${PHASE0_THRESHOLDS.fakeRhymeRatePct}%`} good />
+          <GateRow label="Silence invented verses" value={`= ${PHASE0_THRESHOLDS.silenceInventedVersesMax}`} good />
+          <GateRow
+            label="Timing agreement"
+            value={`≥ ${PHASE0_THRESHOLDS.timingAgreementMinMatches}/${PHASE0_THRESHOLDS.timingAgreementOutOf} (~${TIMING_GATE_PCT}%)`}
+            good
+          />
+          <Text style={styles.honestyNote}>
+            Social and battle surfaces stay frozen behind trust gates (social: {String(TRUST_GATE_FLAGS.social)}, battle: {String(TRUST_GATE_FLAGS.battle)})
+            until real-session trust metrics stay green.
+          </Text>
         </View>
 
         <Pressable onPress={openBeatSelect} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
