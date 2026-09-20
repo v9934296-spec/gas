@@ -43,6 +43,9 @@ const passingFixtures = {
       { humanLabel: "rushed", analyzerLabel: "rushed" },
       { humanLabel: "late", analyzerLabel: "tight" },
       { humanLabel: "tight", analyzerLabel: "tight" },
+      { humanLabel: "tight", analyzerLabel: "late" },
+      { humanLabel: "late", analyzerLabel: "late" },
+      { humanLabel: "rushed", analyzerLabel: "late" },
     ],
   },
 };
@@ -55,6 +58,11 @@ test("Phase 0 validation summary can clear launch gates", () => {
   assert.ok(report.phoneStt.averagePct >= PHASE0_THRESHOLDS.phoneSttPct);
   assert.ok(report.rhyme.obviousRhymePrecisionPct >= PHASE0_THRESHOLDS.rhymePrecisionPct);
   assert.ok(report.rhyme.fakeRhymeRatePct <= PHASE0_THRESHOLDS.fakeRhymeRatePct);
+  assert.equal(report.silence.inventedVerses, 0);
+  assert.equal(report.timing.matches, 5);
+  assert.equal(report.timing.agreementPct, 62.5);
+  assert.equal(report.gates.silenceInventedVerses.pass, true);
+  assert.equal(report.gates.timingAgreement.pass, true);
   assert.equal(report.launchReady, true);
 });
 
@@ -67,18 +75,91 @@ test("Phase 0 launch stays gated when thresholds fail", () => {
   assert.equal(report.launchReady, false);
 });
 
-test("Seed fixture profile remains below the phone STT launch gate", () => {
+test("Seed fixture profile clears the phone STT launch gate", () => {
   const report = summarizePhase0Validation({
     ...passingFixtures,
     phoneStt: {
       cases: [
         { id: "phone-1", reference: "phone mic catches the verse with a little room tone", hypothesis: "phone mic catches the verse with a little tone" },
-        { id: "phone-2", reference: "even with traffic outside the cadence still holds", hypothesis: "even with traffic outside cadence still holds" },
-        { id: "phone-3", reference: "pocket stays tight though the corners get noisy", hypothesis: "pocket stays tight though corners get noisy" },
+        { id: "phone-2", reference: "even with traffic outside the cadence still holds", hypothesis: "even with traffic outside the cadence still holds" },
+        { id: "phone-3", reference: "pocket stays tight though the corners get noisy", hypothesis: "pocket stays tight though the corners noisy" },
       ],
     },
   });
 
-  assert.equal(report.phoneStt.averagePct < PHASE0_THRESHOLDS.phoneSttPct, true);
+  assert.equal(report.phoneStt.averagePct >= PHASE0_THRESHOLDS.phoneSttPct, true);
+  assert.equal(report.gates.phoneStt.pass, true);
+  assert.equal(report.launchReady, true);
+});
+
+test("Phase 0 launch stays gated when silence invents bars", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    silence: {
+      cases: [
+        { expectedNoBars: true, detectedNoBars: false },
+        { expectedNoBars: true, detectedNoBars: true },
+      ],
+    },
+  });
+
+  assert.equal(report.silence.inventedVerses, 1);
+  assert.equal(report.gates.silenceInventedVerses.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Phase 0 launch stays gated when timing agreement is below 5/8", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    timing: {
+      cases: [
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "rushed", analyzerLabel: "tight" },
+      ],
+    },
+  });
+
+  assert.equal(report.timing.matches, 1);
+  assert.equal(report.gates.timingAgreement.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Timing gate enforces the 5/8 ratio threshold on larger datasets", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    timing: {
+      cases: [
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "tight", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+        { humanLabel: "late", analyzerLabel: "tight" },
+      ],
+    },
+  });
+
+  assert.equal(report.timing.matches, 5);
+  assert.equal(report.timing.agreementPct, 50);
+  assert.equal(report.gates.timingAgreement.pass, false);
+  assert.equal(report.launchReady, false);
+});
+
+test("Timing gate requires at least 8 labeled comparisons", () => {
+  const report = summarizePhase0Validation({
+    ...passingFixtures,
+    timing: {
+      cases: [{ humanLabel: "tight", analyzerLabel: "tight" }],
+    },
+  });
+
+  assert.equal(report.timing.matches, 1);
+  assert.equal(report.timing.agreementPct, 100);
+  assert.equal(report.gates.timingAgreement.pass, false);
   assert.equal(report.launchReady, false);
 });

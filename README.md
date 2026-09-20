@@ -28,6 +28,12 @@ npm test
 npm run validate:phase0
 ```
 
+Require the current fixtures to clear every launch gate only when you are making a shipping decision:
+
+```bash
+npm run validate:phase0:launch-ready
+```
+
 ## V1 launch gates
 
 Do not treat V1 as launch-ready unless the validation report clears these thresholds:
@@ -38,6 +44,8 @@ Do not treat V1 as launch-ready unless the validation report clears these thresh
 - fake-rhyme rate: at most 15%
 
 The fixtures in `validation/fixtures/` are seed datasets for the harness shape. Replace them with real clean and phone recordings before using the report as a shipping decision.
+
+Launch-ready means all six trust gates pass: clean STT, phone STT, obvious-rhyme precision, fake-rhyme rate, silence invented verses (must be zero), and timing agreement (must clear 5/8 or better vs human reviewers).
 
 ## 7 core surfaces
 
@@ -50,6 +58,8 @@ The app flow is intentionally constrained to:
 5. Result
 6. Receipts
 7. Progress / History
+
+Social and battle surfaces are frozen for V1 and remain trust-gated off by default until real-session scoring trust gates are met.
 
 ## Pipeline order
 
@@ -68,6 +78,7 @@ The app flow is intentionally constrained to:
 - Evidence receipts for BARZ Phase 0
 - Local save / reopen / delete history with AsyncStorage
 - Seed validation harness for Phase 0 launch gates
+- CI-ready Phase 0 validation report (`npm run validate:phase0`) plus an explicit launch-readiness gate (`npm run validate:phase0:launch-ready`)
 
 ## Honest limitations
 

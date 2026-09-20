@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "doctor": "expo-doctor",
     "test": "node --test --experimental-default-type=module",
-    "validate:phase0": "node --experimental-default-type=module ./scripts/runPhase0Validation.mjs"
+    "validate:phase0": "node --experimental-default-type=module ./scripts/runPhase0Validation.mjs",
+    "validate:phase0:launch-ready": "node --experimental-default-type=module ./scripts/runPhase0Validation.mjs --require-launch-ready"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

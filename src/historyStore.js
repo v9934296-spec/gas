@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { buildBarzPhase0, normalizeBarzEvidence } from "./analyzeRap.js";
 
 const STORAGE_KEY = "raplab:takes:v1";
 let mutationQueue = Promise.resolve();
@@ -11,7 +12,45 @@ async function readStoredTakesStrict() {
     throw new Error("Stored takes payload is invalid.");
   }
 
-  return parsed;
+  return parsed.map(sanitizeTakeScoreInvariant);
+}
+
+export function sanitizeTakeScoreInvariant(take) {
+  if (!take || typeof take !== "object") return take;
+  const currentBarz = take.analysis?.barz || {};
+  const canonicalEvidenceSource = Array.isArray(take.analysis?.evidence) && take.analysis.evidence.length
+    ? take.analysis.evidence
+    : (Array.isArray(take.analysis?.receipts) && take.analysis.receipts.length
+      ? take.analysis.receipts
+      : []);
+  const normalizedEvidence = normalizeBarzEvidence(canonicalEvidenceSource);
+  const normalizedBarzEvidence = normalizeBarzEvidence(
+    Array.isArray(currentBarz.evidence) && currentBarz.evidence.length
+      ? currentBarz.evidence
+      : canonicalEvidenceSource,
+  );
+  const blockedReason = currentBarz.status === "withheld"
+    ? (typeof currentBarz.blockedReason === "string" && currentBarz.blockedReason.trim()
+      ? currentBarz.blockedReason.trim()
+      : "Stored take was previously withheld, so BARZ stays withheld until a fresh analysis run.")
+    : currentBarz.blockedReason;
+  const nextBarz = typeof currentBarz.status === "string"
+    ? {
+      ...currentBarz,
+      blockedReason,
+      evidence: currentBarz.status === "scored" ? normalizedBarzEvidence : [],
+    }
+    : buildBarzPhase0(take.analysis || {}, normalizedEvidence, blockedReason);
+
+  return {
+    ...take,
+    analysis: {
+      ...(take.analysis || {}),
+      barz: nextBarz,
+      evidence: normalizedEvidence,
+      receipts: normalizedEvidence,
+    },
+  };
 }
 
 export async function loadTakes() {
@@ -28,7 +67,8 @@ export async function saveTake(take) {
     .catch(() => undefined)
     .then(async () => {
       const existing = await readStoredTakesStrict();
-      const next = [take, ...existing.filter((item) => item.id !== take.id)].slice(0, 100);
+      const nextTake = sanitizeTakeScoreInvariant(take);
+      const next = [nextTake, ...existing.filter((item) => item.id !== take.id)].slice(0, 100);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
