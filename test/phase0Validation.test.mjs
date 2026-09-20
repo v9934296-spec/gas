@@ -59,7 +59,8 @@ test("Phase 0 validation summary can clear launch gates", () => {
   assert.ok(report.rhyme.obviousRhymePrecisionPct >= PHASE0_THRESHOLDS.rhymePrecisionPct);
   assert.ok(report.rhyme.fakeRhymeRatePct <= PHASE0_THRESHOLDS.fakeRhymeRatePct);
   assert.equal(report.silence.inventedVerses, 0);
-  assert.ok(report.timing.agreementPct >= 62.5);
+  assert.equal(report.timing.matches, 5);
+  assert.equal(report.timing.agreementPct, 62.5);
   assert.equal(report.gates.silenceInventedVerses.pass, true);
   assert.equal(report.gates.timingAgreement.pass, true);
   assert.equal(report.launchReady, true);
