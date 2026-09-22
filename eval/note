@@ -1,0 +1,87 @@
+Machine transcript mistake rate
+Rechecked from saved files in C:\eval\truth. Word error rate of each *_machine.txt against the matching truth .txt. Words are lowercased; punctuation is ignored. Mistake % = (swaps + missing + extra) / truth words.
+2.9%
+Overall machine mistakes
+2.4%
+e01 mistakes
+1.2%
+e02 mistakes
+5.7%
+e03 mistakes
+How to read this
+2.9% is 13 word-level edits on 456 truth words. Word accuracy is 97.4%. e03 has the most misses after the latest truth corrections.
+Mistake rate by episode
+Source: C:\eval\truth · word error rate (%)
+05102.38e011.22e025.65e03
+Per-file scores
+```
+| File                       | Truth words | Machine words | Swaps | Missing | Extra | Mistake % | Correct % |
+| -------------------------- | ----------- | ------------- | ----- | ------- | ----- | --------- | --------- |
+| e01.txt vs e01_machine.txt | 168         | 169           | 3     | 0       | 1     | 2.38%     | 98.21%    |
+| e02.txt vs e02_machine.txt | 164         | 162           | 0     | 2       | 0     | 1.22%     | 98.78%    |
+| e03.txt vs e03_machine.txt | 124         | 123           | 6     | 1       | 0     | 5.65%     | 94.35%    |
+```
+Where the machine differed
+13 word edits total
+```
+| Episode | Change        | Truth                              | Machine                  |
+| ------- | ------------- | ---------------------------------- | ------------------------ |
+| e01     | insert + swap | before all is said                 | before I always say it   |
+| e02     | missing       | that i finally I finally feel free | that I finally feel free |
+| e03     | swap          | thought                            | dye                      |
+| e03     | swap          | had a spark in my head             | And it's working my head |
+| e03     | swap          | stumble on my words                | step on my arms          |
+```
+Overall
+Across e01, e02, and e03 the machine was wrong on 2.9% of words (13 edits / 456 truth words) and correct on 97.4%.
+
+texttype: read bars, no beat, laptop, bathroom
+N01 clean — ElevenLabs transcript: nothing
+N02 clean — ElevenLabs transcript: nothing
+N03 clean — ElevenLabs transcript: nothing
+
+Using ElevenLabs then: no1–no3 transcribed as nothing, so they stay clean.
+
+Whisper’s “You” is ignored. note now says ElevenLabs transcript: nothing for N01, N02, and N03.
+
+---
+e04
+type: read bars, WITH beat in headphones, laptop Voice Recorder
+beat in file: no
+mistake %: 0.0%
+truth words: 114
+machine words: 114
+edits: 0
+correct %: 100.0%
+
+Overall e01–e04: 2.3% (13 wrong / 570 words)
+
+N01/N02/N03: CLEAN (ElevenLabs nothing)
+Whisper on silence: sometimes says "You" — ignore unless it writes a verse
+
+e05-beat
+beat only
+outside/near freeway
+bay area type beat bpm-?
+messy
+
+result: CLEAN — beat only, no lyrics invented
+Google STT: nothing ({"result":[]})
+Whisper base.en: did not finish this run (out of memory)
+duration: ~20 seconds
+file: audio/e05-beat.m4a
+
+---
+e22
+type: freestyle
+mic: laptop
+beat: ipad-speakers (in the room / TV noise)
+background: tv
+duration: 26 seconds
+file: audio/e22.m4a
+audio source: Recording (12).m4a
+STT: Devoice
+
+result: machine matched truth word for word
+machine: eval/machine/e22_machine.txt
+truth: eval/truth/e22.txt

@@ -1,0 +1,7 @@
+id: e13
+type: freestyle
+mic: laptop
+beat: headphones
+background: quiet
+duration_seconds:
+notes: freestyle / beat in headphones

@@ -1,0 +1,5 @@
+﻿no3
+where: bathroom
+mic: laptop
+contents: silence / no verse
+result: ElevenLabs transcript nothing — CLEAN

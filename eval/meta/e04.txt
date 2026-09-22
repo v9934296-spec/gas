@@ -1,0 +1,6 @@
+﻿e04-beat
+where: bathroom
+mic: laptop / Windows Voice Recorder
+beat: headphones from phone (beat NOT in the recording)
+clean or messy: messy
+length:

@@ -1,0 +1,7 @@
+id: e22
+type: freestyle
+mic: laptop
+beat: ipad-speakers
+background: tv
+duration_seconds: 26
+notes: freestyle / iPad beat + TV/background noise. Machine matched truth word for word. Audio: Recording (12).m4a. STT: Devoice.

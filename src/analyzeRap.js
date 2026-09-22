@@ -1,52 +1,12 @@
-const STOP_WORDS = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from", "had", "has",
-  "have", "he", "her", "his", "i", "if", "in", "is", "it", "its", "me", "my", "of", "on",
-  "or", "our", "she", "so", "that", "the", "their", "them", "they", "this", "to", "was", "we",
-  "were", "with", "you", "your",
-]);
+import { STOP_WORDS, clampScore, estimateSyllables, normalizeText, rhymeKey, wordsFrom } from "./lyric.js";
+import { buildMechanicsReport } from "./mechanics.js";
+import { buildScorecard } from "./scorecard.js";
 
 const BARZ_PHASE = Object.freeze({
-  phase: 0,
-  label: "BARZ Phase 0",
+  phase: 1,
+  label: "BARZ Phase 1",
   rule: "no-score-without-evidence",
 });
-
-function normalizeText(text) {
-  return typeof text === "string" ? text : "";
-}
-
-function wordsFrom(text) {
-  return (normalizeText(text).toLowerCase().match(/[a-z0-9']+/g) || []).filter(Boolean);
-}
-
-function estimateSyllables(word) {
-  const cleaned = word.toLowerCase().replace(/[^a-z]/g, "");
-  if (!cleaned) return 0;
-  if (cleaned.length <= 3) return 1;
-
-  let candidate = cleaned;
-  if (candidate.endsWith("e") && !candidate.endsWith("le")) {
-    candidate = candidate.slice(0, -1);
-  }
-
-  const groups = candidate.match(/[aeiouy]+/g);
-  return Math.max(1, groups ? groups.length : 1);
-}
-
-function rhymeKey(word) {
-  let value = word.toLowerCase().replace(/[^a-z]/g, "");
-  if (value.length < 3) return "";
-
-  value = value
-    .replace(/ph/g, "f")
-    .replace(/ck/g, "k")
-    .replace(/ght$/g, "t")
-    .replace(/tion$/g, "shun")
-    .replace(/sion$/g, "zhun");
-
-  const size = value.length >= 7 ? 4 : 3;
-  return value.slice(-size);
-}
 
 function buildLineLikeGroups(text, words) {
   const explicit = normalizeText(text)
@@ -162,10 +122,6 @@ function internalRhymeCandidates(groups) {
   }
 
   return { count, examples };
-}
-
-function clampScore(value) {
-  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function normalizeBeat(beat) {
@@ -287,7 +243,7 @@ function deriveBarzEvidence({ text, metrics, groups, segments, beat }) {
       metric: "wordCount",
       value: metrics.wordCount,
       points: metrics.wordCount >= 32 ? 20 : 10,
-      reason: `${metrics.wordCount} words clears the transcript evidence floor for BARZ Phase 0.`,
+      reason: `${metrics.wordCount} words clears the transcript evidence floor for BARZ Phase 1.`,
       ...safeSpan,
     }));
   }
@@ -371,7 +327,7 @@ export function buildBarzPhase0(metrics, evidence, blockedReason) {
       status: "withheld",
       evidence: [],
       blockedReason,
-      note: "BARZ Phase 0 withholds scores until explicit supporting evidence is attached.",
+      note: "BARZ Phase 1 withholds scores until explicit supporting evidence is attached.",
     };
   }
 
@@ -381,7 +337,7 @@ export function buildBarzPhase0(metrics, evidence, blockedReason) {
       status: "withheld",
       evidence: [],
       blockedReason: "No explicit evidence objects were available for scoring.",
-      note: "BARZ Phase 0 withholds scores until explicit supporting evidence is attached.",
+      note: "BARZ Phase 1 withholds scores until explicit supporting evidence is attached.",
     };
   }
 
@@ -390,7 +346,7 @@ export function buildBarzPhase0(metrics, evidence, blockedReason) {
     status: "scored",
     score: clampScore(normalizedEvidence.reduce((total, item) => total + item.points, 0)),
     evidence: normalizedEvidence,
-    note: "BARZ Phase 0 scores only from deterministic evidence objects with timestamps, lyric spans, and metric reasons.",
+      note: "BARZ Phase 1 scores only from deterministic evidence objects with timestamps, lyric spans, and metric reasons.",
   };
 }
 
@@ -456,11 +412,20 @@ export function analyzeRapText(text, options = {}) {
     ? normalizeBarzEvidence(options.evidence)
     : deriveBarzEvidence({ text: normalized, metrics: analysis, groups, segments, beat });
   const barz = buildBarzPhase0(analysis, explicitEvidence, blockedReason || undefined);
+  const mechanics = buildMechanicsReport(normalized, { takeId: options.takeId });
+  const scorecard = buildScorecard({
+    takeId: options.takeId,
+    mechanics,
+    mode: options.mode,
+    styleCard: options.styleCard,
+  });
 
   return {
     ...analysis,
     evidence: explicitEvidence,
     receipts: explicitEvidence,
     barz,
+    mechanics,
+    scorecard,
   };
 }

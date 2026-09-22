@@ -1,0 +1,7 @@
+id: e25
+type: freestyle
+mic: laptop
+beat: ipad-speakers
+background: tv
+duration_seconds:
+notes: freestyle / iPad beat + TV/background noise

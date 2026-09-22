@@ -1,0 +1,6 @@
+﻿no1
+where: bathroom
+mic: laptop
+contents: silence or "yo is this on"
+result: ElevenLabs transcript nothing — CLEAN
+Whisper: ignore stray "You"

@@ -9,8 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "doctor": "expo-doctor",
-    "test": "node --test --experimental-default-type=module",
-    "validate:phase0": "node --experimental-default-type=module ./scripts/runPhase0Validation.mjs"
+    "test": "node --test ./test/analyzeRap.test.mjs ./test/phase0Validation.test.mjs ./test/scorecard.test.mjs",
+    "validate:phase0": "node ./scripts/runPhase0Validation.mjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -9,7 +9,7 @@ const STRONG_TRANSCRIPT = [
   "I send the phrase and lace the slang",
 ].join("\n");
 
-test("BARZ Phase 0 scores when evidence is present", () => {
+test("BARZ Phase 1 still scores receipts when evidence is present", () => {
   const analysis = analyzeRapText(STRONG_TRANSCRIPT, {
     durationMs: 12000,
     beat: { id: "boom-bap-92", name: "Boom Bap 92", bpm: 92 },
@@ -22,7 +22,7 @@ test("BARZ Phase 0 scores when evidence is present", () => {
   assert.ok(analysis.barz.evidence.every((item) => item.reason && item.lyricSpan.text));
 });
 
-test("BARZ Phase 0 is withheld when evidence is absent", () => {
+test("BARZ Phase 1 is withheld when evidence is absent", () => {
   const analysis = analyzeRapText("", {
     durationMs: 6000,
     beat: { id: "boom-bap-92", name: "Boom Bap 92", bpm: 92 },
@@ -34,7 +34,7 @@ test("BARZ Phase 0 is withheld when evidence is absent", () => {
   assert.ok(!Object.hasOwn(analysis.barz, "score"));
 });
 
-test("BARZ Phase 0 rejects empty and invalid evidence payloads", () => {
+test("BARZ Phase 1 rejects empty and invalid evidence payloads", () => {
   const base = analyzeRapText("steady bars ready scars heavy stars", {
     durationMs: 9000,
     beat: { id: "drill-140", name: "Drill 140", bpm: 140 },

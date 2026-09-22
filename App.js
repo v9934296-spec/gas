@@ -61,6 +61,17 @@ function formatDuration(ms) {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatDim(dim) {
+  return dim?.value == null || dim.value === undefined ? "—" : String(dim.value);
+}
+
+function barFamilyKey(mechanics, barI) {
+  const hit = (mechanics?.rhyme_links || []).find((link) => (
+    link.kind !== "internal" && (link.a_bar === barI || link.b_bar === barI)
+  ));
+  return hit?.phoneme_key || null;
+}
+
 function defaultTakeTitle(date = new Date()) {
   return `Take ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${date.toLocaleTimeString([], {
     hour: "numeric",
@@ -144,7 +155,8 @@ export default function App() {
   const analysis = useMemo(() => analyzeRapText(transcript, {
     durationMs: takeDurationMs,
     beat: selectedBeat,
-  }), [transcript, takeDurationMs, selectedBeat]);
+    takeId: currentTakeId,
+  }), [transcript, takeDurationMs, selectedBeat, currentTakeId]);
   const busy = [PHASE.PREPARING, PHASE.STOPPING, PHASE.TRANSCRIBING].includes(phase);
   const isRecording = phase === PHASE.RECORDING || recorderState?.isRecording;
 
@@ -368,13 +380,13 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.eyebrow}>BARZ PHASE 0</Text>
+            <Text style={styles.eyebrow}>BARZ PHASE 1</Text>
             <Text style={styles.logo}>RAP LAB</Text>
           </View>
           <MiniButton label={`PROGRESS ${takes.length ? `(${takes.length})` : ""}`} onPress={() => openHistory(SCREEN.HOME)} />
         </View>
 
-        <Text style={styles.heroCopy}>No score without evidence. Every result needs deterministic receipts with timestamps, lyric spans, and metric reasons before BARZ can score.</Text>
+        <Text style={styles.heroCopy}>Phase 0 evidence still gates the score. Phase 1 adds a frozen scorecard: mechanics before meaning, cite or drop, pocket stays blank without audio.</Text>
 
         <View style={styles.infoCard}>
           <Text style={styles.cardKicker}>7 CORE SURFACES</Text>
@@ -391,7 +403,7 @@ export default function App() {
         </View>
 
         <Pressable onPress={openBeatSelect} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-          <Text style={styles.primaryButtonText}>START PHASE 0 FLOW</Text>
+          <Text style={styles.primaryButtonText}>START PHASE 1 FLOW</Text>
         </Pressable>
       </ScrollView>
     );
@@ -468,7 +480,7 @@ export default function App() {
             <View style={[styles.recordCore, isRecording && styles.stopCore]} />
             <Text style={styles.recordButtonLabel}>{isRecording ? "STOP" : "RECORD"}</Text>
           </Pressable>
-          <Text style={styles.recordHint}>{isRecording ? "Finish the take when you have a full bar set." : "Phase 0 cares about transcript evidence first: clear voice, low noise, under one minute."}</Text>
+          <Text style={styles.recordHint}>{isRecording ? "Finish the take when you have a full bar set." : "Phase 1 still needs a clean transcript first. Edit it before you trust the scorecard."}</Text>
         </View>
 
         {phase === PHASE.ERROR ? (
@@ -510,11 +522,27 @@ export default function App() {
   function renderResult() {
     const repetitions = analysis.repeatedWords || [];
     const barz = analysis.barz;
+    const scorecard = analysis.scorecard;
+    const bars = analysis.mechanics?.bars || [];
+    const familyKeys = [...new Set(bars.map((bar) => barFamilyKey(analysis.mechanics, bar.i)).filter(Boolean))];
+    const familyColor = (key) => {
+      const palette = ["#54FF00", "#7AD1FF", "#FFBB54", "#D7A6FF", "#FF6A83"];
+      const index = Math.max(0, familyKeys.indexOf(key));
+      return palette[index % palette.length];
+    };
+    const dims = [
+      ["technical", "TECH"],
+      ["punch", "PUNCH"],
+      ["originality", "ORIG"],
+      ["coherence", "COHERE"],
+      ["pocket", "POCKET"],
+      ["cleanliness", "CLEAN"],
+    ];
     return (
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.eyebrow}>SURFACE 5 / 7</Text>
+            <Text style={styles.eyebrow}>SURFACE 5 / 7 · SCORECARD 1.0</Text>
             <TextInput
               value={takeTitle}
               onChangeText={(value) => {
@@ -530,34 +558,73 @@ export default function App() {
           <MiniButton label="NEW TAKE" onPress={resetForNewTake} />
         </View>
 
+        <View style={styles.overallCard}>
+          <Text style={styles.cardKicker}>OVERALL · CYPHER VERDICT</Text>
+          <Text style={styles.overallValue}>{formatDim(scorecard?.scores?.overall)}</Text>
+          <Text style={styles.cardCopy}>{scorecard?.scores?.overall?.why || barz.note}</Text>
+        </View>
+
+        <View style={styles.chipRow}>
+          {dims.map(([key, label]) => (
+            <View key={key} style={styles.dimChip}>
+              <Text style={styles.dimChipLabel}>{label}</Text>
+              <Text style={styles.dimChipValue}>{formatDim(scorecard?.scores?.[key])}</Text>
+            </View>
+          ))}
+        </View>
+
         <View style={styles.metricGrid}>
           <Metric value={analysis.wordCount} label="WORDS" />
-          <Metric value={analysis.estimatedSyllables} label="EST. SYLLABLES" />
-          <Metric value={`${analysis.vocabularyVarietyPct}%`} label="VOCAB VARIETY" />
+          <Metric value={analysis.mechanics?.stats?.bar_count ?? analysis.estimatedBars} label="BARS" />
           <Metric value={`${analysis.rhymeDensityPct}%`} label="RHYME DENSITY" />
-          <Metric value={`${analysis.timingAgreementPct}%`} label="TIMING AGREEMENT" />
-          <Metric value={typeof barz.score === "number" ? barz.score : "—"} label="BARZ PHASE 0" />
+          <Metric value={typeof barz.score === "number" ? barz.score : "—"} label="EVIDENCE POINTS" />
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.cardKicker}>VERSE · STAGE 2</Text>
+          <Text style={styles.cardCopy}>Rhyme colors come from the mechanics map. The model is not allowed to add links.</Text>
+          {bars.length ? bars.map((bar) => {
+            const family = barFamilyKey(analysis.mechanics, bar.i);
+            return (
+              <View key={bar.i} style={[styles.barRow, family && { borderLeftColor: familyColor(family) }]}>
+                <Text style={styles.barIndex}>{bar.i}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.barText}>{bar.text}</Text>
+                  <Text style={styles.barMeta}>{bar.syllables} syl · {family ? `rhyme ${family}` : "unlinked"}</Text>
+                </View>
+              </View>
+            );
+          }) : (
+            <Text style={styles.cardCopy}>No bars yet.</Text>
+          )}
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.cardKicker}>SCORING RULE</Text>
           <Text style={styles.cardTitle}>No score without evidence.</Text>
-          <Text style={styles.cardCopy}>{barz.note}</Text>
-          <Text style={styles.sectionLine}>Status: <Text style={styles.sectionStrong}>{barz.status.toUpperCase()}</Text></Text>
-          <Text style={styles.sectionLine}>Evidence receipts: <Text style={styles.sectionStrong}>{barz.evidence.length}</Text></Text>
-          {typeof barz.score === "number" ? (
-            <Text style={styles.sectionLine}>Score: <Text style={styles.sectionStrong}>{barz.score}</Text></Text>
-          ) : (
-            <Text style={styles.sectionLine}>{barz.blockedReason || "Score withheld."}</Text>
-          )}
+          <Text style={styles.cardCopy}>{scorecard?.notes || barz.note}</Text>
+          <Text style={styles.sectionLine}>Receipts: <Text style={styles.sectionStrong}>{barz.status.toUpperCase()}</Text> · {barz.evidence.length}</Text>
+          <Text style={styles.sectionLine}>Scheme: <Text style={styles.sectionStrong}>{analysis.mechanics?.scheme_guess || "—"}</Text></Text>
+          {barz.blockedReason ? <Text style={styles.sectionLine}>{barz.blockedReason}</Text> : null}
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.cardKicker}>STRUCTURE</Text>
-          <Text style={styles.sectionLine}>Analysis groups: <Text style={styles.sectionStrong}>{analysis.analysisGroups}</Text></Text>
-          <Text style={styles.sectionLine}>Groups sharing end-rhyme candidates: <Text style={styles.sectionStrong}>{analysis.groupsWithEndRhyme}</Text></Text>
-          <Text style={styles.sectionLine}>Longest repeated end-rhyme chain: <Text style={styles.sectionStrong}>{analysis.longestEndRhymeChain || "—"}</Text></Text>
-        </View>
+        {scorecard?.best_bars?.length ? (
+          <View style={styles.sectionCard}>
+            <Text style={styles.cardKicker}>BEST BARS</Text>
+            {scorecard.best_bars.map((item) => (
+              <Text key={`best-${item.bar_i}`} style={styles.sectionLine}>{item.bar_i}: {item.quote}</Text>
+            ))}
+          </View>
+        ) : null}
+
+        {scorecard?.weak_bars?.length ? (
+          <View style={styles.sectionCard}>
+            <Text style={styles.cardKicker}>WEAK BARS</Text>
+            {scorecard.weak_bars.map((item) => (
+              <Text key={`weak-${item.bar_i}`} style={styles.sectionLine}>{item.bar_i}: {item.quote}</Text>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.sectionCard}>
           <Text style={styles.cardKicker}>REPEATED LANGUAGE</Text>
@@ -576,7 +643,7 @@ export default function App() {
 
         <View style={styles.sectionCard}>
           <Text style={styles.cardKicker}>EDIT THE TRANSCRIPT</Text>
-          <Text style={styles.cardCopy}>Fix recognition mistakes or add line breaks. Receipts and scores update from the deterministic analyzers.</Text>
+          <Text style={styles.cardCopy}>Fix recognition mistakes or add line breaks. Stage 2 and the scorecard recompute from the edited words.</Text>
           <TextInput
             multiline
             value={transcript}
@@ -593,7 +660,7 @@ export default function App() {
 
         <View style={styles.honestyCard}>
           <Text style={styles.cardKicker}>HONESTY CHECK</Text>
-          <Text style={styles.cardCopy}>{analysis.note}</Text>
+          <Text style={styles.cardCopy}>{analysis.note} Pocket is null until audio_coach. Punch stays null unless a bar can be quoted as a setup/payoff.</Text>
         </View>
 
         <Pressable onPress={persistCurrentTake} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
@@ -673,7 +740,7 @@ export default function App() {
               <View key={take.id} style={styles.historyCard}>
                 <Pressable onPress={() => openTake(take)} style={({ pressed }) => [styles.historyMain, pressed && styles.pressed]}>
                   <Text style={styles.historyTitle}>{take.title || "Saved take"}</Text>
-                  <Text style={styles.historyMeta}>{take.beat?.name || BEAT_OPTIONS[0].name} · {take.analysis?.wordCount ?? 0} words · {formatDuration(take.durationMs || 0)}</Text>
+                  <Text style={styles.historyMeta}>{take.beat?.name || BEAT_OPTIONS[0].name} · overall {formatDim(take.analysis?.scorecard?.scores?.overall)} · {formatDuration(take.durationMs || 0)}</Text>
                   <Text style={styles.historyPreview} numberOfLines={2}>{take.transcript}</Text>
                 </Pressable>
                 <MiniButton label="DELETE" danger onPress={() => confirmDelete(take)} />
@@ -745,6 +812,15 @@ const styles = StyleSheet.create({
   metric: { width: "31%", minWidth: 140, flexGrow: 1, borderRadius: 15, backgroundColor: "#151517", padding: 16, borderWidth: 1, borderColor: "#242427" },
   metricValue: { color: "#FFFFFF", fontSize: 26, fontWeight: "900" },
   metricLabel: { color: "#77777C", fontSize: 9, fontWeight: "900", letterSpacing: 1.1, marginTop: 5 },
+  overallCard: { borderRadius: 18, backgroundColor: "#111A0F", padding: 18, borderWidth: 1, borderColor: "#2A4A1C" },
+  overallValue: { color: "#FFFFFF", fontSize: 48, fontWeight: "900", marginTop: 8, letterSpacing: -2 },
+  dimChip: { borderRadius: 14, backgroundColor: "#151517", paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: "#242427", minWidth: 96 },
+  dimChipLabel: { color: "#77777C", fontSize: 9, fontWeight: "900", letterSpacing: 1.1 },
+  dimChipValue: { color: "#FFFFFF", fontSize: 22, fontWeight: "900", marginTop: 4 },
+  barRow: { flexDirection: "row", gap: 10, marginTop: 12, paddingLeft: 10, borderLeftWidth: 3, borderLeftColor: "#242427" },
+  barIndex: { color: "#54FF00", fontSize: 12, fontWeight: "900", width: 18, marginTop: 2 },
+  barText: { color: "#F2F2F3", fontSize: 15, lineHeight: 22 },
+  barMeta: { color: "#737378", fontSize: 11, marginTop: 4 },
   sectionCard: { borderRadius: 18, backgroundColor: "#151517", padding: 18, borderWidth: 1, borderColor: "#242427" },
   sectionLine: { color: "#9C9CA1", fontSize: 14, lineHeight: 24, marginTop: 7 },
   sectionStrong: { color: "#FFFFFF", fontWeight: "900" },

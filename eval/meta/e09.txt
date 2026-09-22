@@ -1,0 +1,7 @@
+id: e09
+type: freestyle
+mic: laptop
+beat: none
+background: quiet
+duration_seconds:
+notes: freestyle / no beat

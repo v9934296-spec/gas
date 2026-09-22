@@ -1,0 +1,7 @@
+id: e19
+type: freestyle
+mic: laptop
+beat: ipad-speakers
+background: normal-room
+duration_seconds:
+notes: freestyle / beat from iPad speakers
